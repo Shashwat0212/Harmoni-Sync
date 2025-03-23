@@ -1,0 +1,17 @@
+# Ignore Python virtual env
+venv/
+venv-py311/
+
+# Bytecode and cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code settings
+.vscode/
+
+# MacOS junk
+.DS_Store
+
+# Python package metadata
+*.egg-info/
