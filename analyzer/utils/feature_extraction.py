@@ -1,5 +1,6 @@
 import numpy as np
 import librosa
+from utils.whisper_segment import run_yamnet
 
 def estimate_key(y, sr):
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
@@ -26,3 +27,24 @@ def extract_timbre(y, sr):
     zcr = librosa.feature.zero_crossing_rate(y)
     spectral_contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
     return np.mean(zcr), np.mean(spectral_contrast)
+
+def detect_genre(filepath):
+    y, sr = librosa.load(filepath, mono=True)
+    label, confidence = run_yamnet(y, sr)
+
+    # Map label to generic genres
+    genre_map = {
+        "pop music": "Pop",
+        "rock music": "Rock",
+        "hip hop music": "Hip-Hop",
+        "classical music": "Classical",
+        "jazz": "Jazz",
+        "techno": "Electronic",
+        "dance music": "EDM"
+    }
+
+    for known_label in genre_map:
+        if known_label in label.lower():
+            return genre_map[known_label]
+
+    return "Unknown"
