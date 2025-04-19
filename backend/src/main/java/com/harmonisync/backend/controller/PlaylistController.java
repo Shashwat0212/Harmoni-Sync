@@ -11,6 +11,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -20,29 +22,42 @@ public class PlaylistController {
     private static final String ANALYZER_URL = "http://localhost:6000/analyze";
 
     @PostMapping("/upload")
-    public ResponseEntity<TrackMetadata> uploadTrack(@RequestParam("file") MultipartFile file) {
-        try {
-            File tempFile = File.createTempFile("track-", file.getOriginalFilename());
-            file.transferTo(tempFile);
+    public ResponseEntity<List<TrackMetadata>> uploadTracks(@RequestParam("files") MultipartFile[] files) {
+        List<TrackMetadata> metadataList = new ArrayList<>();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        for (MultipartFile file : files) {
+            try {
+                // Save to temp file
+                File tempFile = File.createTempFile("track-", file.getOriginalFilename());
+                file.transferTo(tempFile);
 
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", new FileSystemResource(tempFile));
+                // Build request to analyzer
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
-            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+                MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+                body.add("file", new FileSystemResource(tempFile));
 
-            ResponseEntity<TrackMetadata> response = restTemplate.postForEntity(
-                    ANALYZER_URL,
-                    requestEntity,
-                    TrackMetadata.class);
+                HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-            tempFile.delete();
-            return response;
+                // Call analyzer
+                ResponseEntity<TrackMetadata> response = restTemplate.postForEntity(
+                        ANALYZER_URL,
+                        requestEntity,
+                        TrackMetadata.class);
 
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+                if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                    metadataList.add(response.getBody());
+                }
+
+                // Cleanup
+                tempFile.delete();
+
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
         }
+
+        return ResponseEntity.ok(metadataList);
     }
 }
