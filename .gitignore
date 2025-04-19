@@ -21,3 +21,6 @@ temp.wav
 .vscode/
 analyzer/yamnet/yamnet_class_map.csv
 analyzer/yamnet/yamnet.tflite
+
+/frontend/node_modules
+/frontend/build
