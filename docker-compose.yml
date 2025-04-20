@@ -1,0 +1,38 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - harmonynet
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - analyzer
+    environment:
+      - ANALYZER_URL=http://analyzer:6000/analyze
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - harmonynet
+
+  analyzer:
+    build: ./analyzer
+    ports:
+      - "6000:6000"
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - harmonynet
+
+volumes:
+  uploads:
+
+networks:
+  harmonynet:
