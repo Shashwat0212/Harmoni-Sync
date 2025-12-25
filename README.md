@@ -1,139 +1,142 @@
-# HarmoniSync – Experimental R&D Branch
+# Skrillex Live-Set Playlist Embedding Project
 
-## Purpose of This Branch
+## Goal
 
-This repository is the **primary HarmoniSync project repository**. However, **this branch is intentionally used as a research-and-development (R&D) ground**.
-
-Its purpose is to:
-
-> **Explore *why*, *what*, and *how* AI/ML concepts should be applied to HarmoniSync, on a day-by-day basis, before they are promoted into stable, production-ready features.**
-
-This branch prioritizes experimentation, understanding, and validation over completeness or polish. Ideas developed here may later be **selectively integrated** into the main HarmoniSync product once their value and limitations are well understood.
+Build a **sequence-aware music recommendation system** using Skrillex live set tracklists. The system learns a latent embedding space where tracks that appear in similar DJ contexts are close, enabling generation of **probable playlists** given any Skrillex track.
 
 ---
 
-## What This Branch Is Used For
+## High-Level Idea (NLP Analogy)
 
-This branch is used to:
-
-* Experiment with **AI/ML concepts in isolation** before committing them to the main HarmoniSync code path
-* Understand **why an approach works**, not just whether it works
-* Apply weekly learning topics from the 24-week roadmap directly to HarmoniSync
-* Prototype learning-first implementations that may later influence production design
-* Maintain a safe space where code can be exploratory, imperfect, or temporary
-
-HarmoniSync here acts as an **R&D laboratory** whose outputs inform the main project.
+* **Corpus** → Collection of Skrillex live set tracklists
+* **Sentence** → One live DJ set (ordered)
+* **Token / Word** → One track
+* **Context window** → Neighboring tracks in the set
+* **Model** → Word2Vec (Skip-gram)
+* **Embedding space** → Tracks clustered by co-occurrence and sequence context
 
 ---
 
-## What This Branch Is NOT
+## Data Sources
 
-This branch is explicitly **not** meant to:
+Potential sources for live-set tracklists:
 
-* Represent the final HarmoniSync architecture
-* Ship user-facing or production-critical features directly
-* Lock in design or technology choices prematurely
-* Optimize for performance, scale, or cost
-* Serve as a polished or stable backend
+* DJ set websites (e.g. 1001Tracklists)
+* Fan-maintained setlist archives
+* YouTube video descriptions of live sets
+* Reddit / forum posts with curated tracklists
 
-Any concept graduating from this branch must be **re-evaluated and re-engineered** before inclusion in the main project.
-
----
-
-## Learning Philosophy
-
-Each experiment in this repository follows a strict rule:
-
-> **Only implement what directly reinforces the concept being learned that week.**
-
-If a roadmap concept does not map cleanly to HarmoniSync, **no experiment is added** for that week.
-
-This prevents scope creep and ensures cognitive focus.
+Each live set should be captured as an **ordered list of track names**.
 
 ---
 
-## Core Focus Areas (Progressive) in This Repository
+## Dataset Representation
 
-Over time, this branch may include experiments related to:
+Raw dataset structure:
 
-1. **Sequence Representation**
+```json
+[
+  ["Track A", "Track B", "Track C"],
+  ["Track D", "Track A", "Track E"],
+  ["Track B", "Track C", "Track F"]
+]
+```
 
-   * Treating DJ setlists as ordered sequences
-   * Songs as tokens, sets as sentences
+Key constraints:
 
-2. **Embedding Learning**
-
-   * Song2Vec-style embeddings using Word2Vec
-   * Context windows derived from real DJ transitions
-
-3. **Similarity & Retrieval**
-
-   * Cosine similarity over learned embeddings
-   * Neighborhood inspection and sanity checks
-
-4. **Evaluation Without Labels**
-
-   * Qualitative coherence checks
-   * Hit@k-style reasoning
-   * Failure case documentation
-
-5. **Model Introspection**
-
-   * Visualizing embedding spaces
-   * Understanding sensitivity to hyperparameters
-
-Each area is explored only when it aligns with the main roadmap timeline.
+* Order must be preserved
+* No shuffling of tracks
+* Each list represents one coherent DJ performance
 
 ---
 
-## Expected Outputs from This Repository
+## Data Cleaning & Canonicalization
 
-This branch prioritizes **learning artifacts** over features:
+Steps:
 
-* Small Python scripts or notebooks
-* Saved embeddings and intermediate data
-* Visualizations (PCA / UMAP plots)
-* Markdown notes documenting insights and failures
-* Minimal, explainable recommendation functions
+1. Normalize track names (lowercase, trim whitespace)
+2. Resolve duplicates / aliases if needed
+3. Count track frequencies across all sets
+4. Remove extremely rare tracks (noise threshold, e.g. < 2 occurrences)
+5. Rebuild clean sequences
 
-Every artifact should answer *why something works or fails*, not just *what works*.
+Optional:
 
----
-
-## Relationship to the 24-Week Roadmap
-
-This branch evolves **in parallel with the 24-week Agentic AI learning roadmap**.
-
-Each week:
-
-1. A new AI/ML concept is learned
-2. That concept is experimentally applied within HarmoniSync
-3. Observations, limitations, and failure modes are documented
-4. A conscious decision is made on whether the idea should:
-
-   * Be discarded
-   * Remain as intuition only
-   * Be promoted into the main HarmoniSync product
-
-This process ensures that HarmoniSync grows **intentionally and transparently**, not through ad-hoc feature addition.
+* Map tracks to integer IDs (`track2id`, `id2track`) for downstream tasks
 
 ---
 
-## Long-Term Value
+## Model Choice: Word2Vec (Skip-gram)
 
-By the end of the roadmap, this repository should serve as:
+**Why Skip-gram?**
 
-* A clear record of conceptual understanding
-* A reusable baseline for comparison with LLM-based systems
-* Evidence of first-principles thinking in applied ML
-* A strong discussion anchor for interviews and design conversations
+* Better representations for rare tracks
+* Stronger semantic structure with small-to-medium datasets
+* Well-suited for co-occurrence-based learning
+
+Core hyperparameters to tune:
+
+* `vector_size` (e.g. 64–256)
+* `window` (context size, e.g. 3–5 tracks)
+* `negative` (negative sampling rate)
+* `epochs`
 
 ---
 
-## Guiding Principle for This Branch
+## Training Objective
 
-> **Experiment first. Understand deeply. Promote selectively.**
+Learn embeddings such that:
 
-This branch exists to answer *why* before *how*.
+> Tracks that appear in similar DJ contexts (before/after similar tracks) are close in vector space.
 
-Only AI concepts that demonstrate clear value, known trade-offs, and explainable behavior should eventually influence the stable HarmoniSync product.
+This implicitly captures:
+
+* Energy transitions
+* Genre compatibility
+* DJ mixing habits
+
+---
+
+## Inference: Playlist Generation
+
+Given a seed track:
+
+1. Retrieve nearest neighbors in embedding space (cosine similarity)
+2. Rank candidate tracks by similarity
+3. Optionally filter:
+
+   * Already-played tracks
+   * Same artist duplicates
+4. Sample or sort to form a **probable playlist continuation**
+
+---
+
+## Evaluation (Offline)
+
+Qualitative:
+
+* Nearest-neighbor sanity checks
+* Visualization (e.g. PCA / t-SNE of embeddings)
+
+Quantitative (optional):
+
+* Predict held-out tracks from known DJ sets
+* Mean reciprocal rank (MRR) or top-k hit rate
+
+---
+
+## Future Extensions
+
+* Position-aware models (track order weighting)
+* Transition-based modeling (bigram / Markov layer)
+* Replace Word2Vec with:
+
+  * FastText (subword robustness)
+  * Transformer encoder for longer context
+* Integrate into a local-first RAG or recommendation system
+
+---
+
+## Status
+
+📌 Planning phase only — no implementation started yet.
